@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -ex
+
+# Our code is present at /RUNCODE to be mounted during the docker run
+CODEDIR=${CODEDIR:-/opt/code}
+
+
+# rootfs of 50MB blocksize 1M
+dd if=/dev/zero of=/tmp/rootfs bs=1M count=256
+mkfs.ext4 /tmp/rootfs
+
+# Create mountpoint for the fs
+mkdir /tmp/rootfsdevice
+# Mount it as a fake device (loop)
+mount /tmp/rootfs /tmp/rootfsdevice -o loop
+
+# Extract alpine mini rootfs into our rootfs/device
+tar xzf /tmp/alpine-minirootfs-3.8.1-x86_64.tar.gz -C /tmp/rootfsdevice
+cp -r  /tmp/overlay/* /tmp/rootfsdevice/
+
+# Move all python code into /usr/local/pyrun
+mkdir -p  /tmp/rootfsdevice/usr/local/pyrun
+cp $CODEDIR/*py  /tmp/rootfsdevice/usr/local/pyrun/
+
+# Delete password for root user 
+cat > /tmp/rootfsdevice/prepare.sh <<EOF
+passwd root -d root
+apk add -u openrc ca-certificates python
+exit 
+EOF
+
+
+
+chroot /tmp/rootfsdevice/ /bin/sh /prepare.sh
+
+rm /tmp/rootfsdevice/prepare.sh 
+
+
+umount /tmp/rootfsdevice
+
+OUTDIR=${OUTDIR:-$CODEDIR}
+
+mkdir -p $OUTDIR || :
+
+cp -r /tmp/rootfs $OUTDIR
