@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -ex
+
+# Our code is present at /RUNCODE to be mounted during the docker run
+CODEDIR=${CODEDIR:-/opt/code}
+ROOTFSPATH=/tmp/rootfsdevice
+
+# rootfs of 256MB blocksize 1M
+dd if=/dev/zero of=/tmp/rootfs bs=1M count=1024
+mkfs.ext4 /tmp/rootfs
+
+# Create mountpoint for the fs
+mkdir $ROOTFSPATH
+# Mount it as a fake device (loop)
+mount /tmp/rootfs $ROOTFSPATH -o loop
+
+tar xzf /tmp/ubuntu-base-16.04-core-amd64.tar.gz -C $ROOTFSPATH
+
+cp $(which qemu-aarch64-static) $ROOTFSPATH/usr/bin/
+cp -r /tmp/overlay/* $ROOTFSPATH/
+
+mkdir $ROOTFSPATH/usr/local/pyrun
+cp $CODEDIR/*  $ROOTFSPATH/usr/local/pyrun/
+
+cat > $ROOTFSPATH/prepare.sh <<EOF
+passwd -d root
+apt-get update
+apt-get install -y python3 net-tools sudo vim nano udev
+exit 
+EOF
+
+chroot $ROOTFSPATH /bin/bash /prepare.sh
+
+rm $ROOTFSPATH/prepare.sh
+
+umount /tmp/rootfsdevice
+
+OUTDIR=${OUTDIR:-$CODEDIR}
+
+mkdir -p $OUTDIR || :
+
+cp -r /tmp/rootfs $OUTDIR
