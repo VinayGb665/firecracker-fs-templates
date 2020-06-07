@@ -1,3 +1,4 @@
+![CI](https://github.com/VinayGb665/firecracker-fs-templates/workflows/CI/badge.svg)
 # Firecracker images/templates
 
 Build rootfs to run different workloads on firecracker based VMs.
